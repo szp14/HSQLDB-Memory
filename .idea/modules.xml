@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/integration/extAuthWithSpring/extAuthWithSpring.iml" filepath="$PROJECT_DIR$/integration/extAuthWithSpring/extAuthWithSpring.iml" />
+      <module fileurl="file://$PROJECT_DIR$/integration/hibernate/hibernate.iml" filepath="$PROJECT_DIR$/integration/hibernate/hibernate.iml" />
+      <module fileurl="file://$PROJECT_DIR$/integration/hibernate_3_3_1/hibernate_3_3_1.iml" filepath="$PROJECT_DIR$/integration/hibernate_3_3_1/hibernate_3_3_1.iml" />
+      <module fileurl="file://$PROJECT_DIR$/hsqldb.iml" filepath="$PROJECT_DIR$/hsqldb.iml" />
+      <module fileurl="file://$PROJECT_DIR$/testrun/testrun.iml" filepath="$PROJECT_DIR$/testrun/testrun.iml" />
+      <module fileurl="file://$PROJECT_DIR$/doc/verbatim/verbatim.iml" filepath="$PROJECT_DIR$/doc/verbatim/verbatim.iml" />
+    </modules>
+  </component>
+</project>

@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="apache-groovy-binary-2.4.8">
+    <CLASSES />
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../apache-groovy-binary-2.4.8.zip!/" />
+    </SOURCES>
+    <jarDirectory url="jar://$PROJECT_DIR$/../apache-groovy-binary-2.4.8.zip!/" recursive="false" type="SOURCES" />
+  </library>
+</component>

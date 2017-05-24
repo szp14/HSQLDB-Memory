@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="lib">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/hsqldb.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/servlet-2_3-fcs-classfiles.zip!/" />
+      <root url="jar://$PROJECT_DIR$/lib/sqltool.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

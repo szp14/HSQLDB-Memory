@@ -1,0 +1,28 @@
+/*C5*/SET SCHEMA PUBLIC
+drop table cachetable
+create cached table student( id int,\u000aname char(20), number char(20), school char(20), primary key(id))
+INSERT INTO STUDENT VALUES(1,'Alice               ','2017013000          ','School of Software  ')
+COMMIT
+INSERT INTO STUDENT VALUES(2,'Bob                 ','2017013001          ','School of Software  ')
+COMMIT
+INSERT INTO STUDENT VALUES(3,'Cathy               ','2017013002          ','CST                 ')
+COMMIT
+INSERT INTO STUDENT VALUES(4,'Durant              ','2017013003          ','CST                 ')
+COMMIT
+/*C6*/SET SCHEMA PUBLIC
+DELETE FROM STUDENT WHERE ID=4
+COMMIT
+DISCONNECT
+/*C5*/DISCONNECT
+/*C8*/SET SCHEMA PUBLIC
+INSERT INTO STUDENT VALUES(4,'Durant              ','2017013003          ','CST                 ')
+COMMIT
+set database transaction control MVCC
+/*C7*/SET SCHEMA PUBLIC
+set database transaction control MVCC
+set database transaction control MVCC
+/*C8*/DELETE FROM STUDENT WHERE ID=1
+INSERT INTO STUDENT VALUES(1,'Alice               ','2017013000          ','School of Software  ')
+COMMIT
+SET DATABASE TRANSACTION CONTROL MVCC
+/*C7*/SET DATABASE TRANSACTION CONTROL MVCC
