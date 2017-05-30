@@ -168,7 +168,7 @@ public class Testdb {
             // generate unique values for new rows- useful for row keys
         	
         	// --CREATE 8 tables--
-        	if (false)
+        	if (true)
         	{
 	        	try {
 		        	File file = new File("F:\\2.17.2\\data\\dss.ddl");
@@ -178,7 +178,10 @@ public class Testdb {
 	                while ((tempString = reader.readLine()) != null) {
 	                	totalString += tempString;
 	                }
+	                startTime = System.currentTimeMillis();
 	                db.update(totalString);
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("CREATE time:" + (endTime - startTime) + "ms");
 	                reader.close();
 	            } catch (IOException e) {
 	                e.printStackTrace();
@@ -198,21 +201,23 @@ public class Testdb {
             // add some rows - will create duplicates if run more then once
             // the id column is automatically generated
         	
-	        startTime = System.currentTimeMillis();
         	// --INSERT 1GB data--
-        	if (false)
+        	if (true)
         	{
 	        	try {
 	        		int i = 0;
 	        		File file = new File("F:\\2.17.2\\data\\_insertSQL.txt");
 	        		BufferedReader reader = new BufferedReader(new FileReader(file));
 	        		String tempString = null;
+	                startTime = System.currentTimeMillis();
 	                while ((tempString = reader.readLine()) != null) {
 	                    db.update(tempString);
 	                    i++;
 	                    if(i % 10000 == 0)
 	                    	System.out.println(i);
 	                }
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("INSERT time:" + (endTime - startTime) + "ms");
 	                reader.close();
 	            } catch (IOException e) {
 	                e.printStackTrace();
@@ -223,7 +228,7 @@ public class Testdb {
         	//db.query("SELECT * FROM region");
         	
         	// --do 22 SELECT--
-        	if (false)
+        	if (true)
         	{
 	        	try {
 	        		File file = new File("F:\\2.17.2\\data\\test.sql");
@@ -233,7 +238,10 @@ public class Testdb {
 	                while ((tempString = reader.readLine()) != null) {
 	                	totalString += tempString + ' ';
 	                }
+	                startTime = System.currentTimeMillis();
 	                db.query(totalString);
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("SELECT time:" + (endTime - startTime) + "ms");
 	                reader.close();
 	            } catch (IOException e) {
 	                e.printStackTrace();
@@ -241,19 +249,22 @@ public class Testdb {
         	}
         	
         	// --do UPDATE--
-        	if (false)
+        	if (true)
         	{
 	        	try {
 	        		int i = 0;
 	        		File file = new File("F:\\2.17.2\\data\\_updateSQL.txt");
 	        		BufferedReader reader = new BufferedReader(new FileReader(file));
 	        		String tempString = null;
+	                startTime = System.currentTimeMillis();
 	                while ((tempString = reader.readLine()) != null) {
 	                    db.update(tempString);
 	                    i++;
 	                    if(i % 500 == 0)
 	                    	System.out.println(i);
 	                }
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("UPDATE time:" + (endTime - startTime) + "ms");
 	                reader.close();
 	            } catch (IOException e) {
 	                e.printStackTrace();
@@ -268,20 +279,20 @@ public class Testdb {
 	        		File file = new File("F:\\2.17.2\\data\\_deleteSQL.txt");
 	        		BufferedReader reader = new BufferedReader(new FileReader(file));
 	        		String tempString = null;
+	                startTime = System.currentTimeMillis();
 	                while ((tempString = reader.readLine()) != null) {
 	                    db.update(tempString);
 	                    i++;
 	                    if(i % 500 == 0)
 	                    	System.out.println(i);
 	                }
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("DELETE time:" + (endTime - startTime) + "ms");
 	                reader.close();
 	            } catch (IOException e) {
 	                e.printStackTrace();
 	            }
         	}
-
-        	endTime = System.currentTimeMillis();
-        	System.out.println("time:" + (endTime - startTime) + "ms");
         	
             // at end of program
             db.shutdown();
