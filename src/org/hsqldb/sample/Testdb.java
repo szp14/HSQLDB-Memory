@@ -38,19 +38,44 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import java.io.*;
+
 /**
  * Title:        Testdb
  * Description:  simple hello world db example of a
  *               standalone persistent db application
  *
- *               every time it runs it adds four more rows to table40
+ *               every time it runs it adds four more rows to sample_table
  *               it does a query and prints the results to standard out
  *
  * Author: Karl Meissner karl@meissnersd.com
  */
 public class Testdb {
 
-    Connection conn;                                                //our connnection to the db - presist for life of program
+    Connection conn;     //our connnection to the db - presist for life of program
+
+	static String filePath		= "/Users/szp/Desktop/szp/HSQLpro/TPCHtest/";
+	static String dataDDL 		= filePath + "tpc-h/dss.ddl";
+	static String fileInsert 	= filePath + "data0.5/insertSQL.txt";
+	static String testQuery		= filePath + "tpc-h/query/test7.sql";
+	static String testInsert	= filePath + "data0.5/updateSQL.txt";
+	static String testDelete	= filePath + "data0.5/deleteSQL.txt";
+
+//	static boolean isDDl		= true;
+//	static boolean isFileInsert	= true;
+//	static boolean isQuery		= false;
+
+	static boolean isDDl		= false;
+	static boolean isFileInsert	= false;
+	static boolean isQuery		= true;
+
+//	static boolean isDDl		= false;
+//	static boolean isFileInsert	= false;
+//	static boolean isQuery		= false;
+
+	static boolean isInsert		= false;
+	static boolean isDelete		= false;
+
 
     // we dont want this garbage collected until we are done
     public Testdb(String db_file_name_prefix) throws Exception {    // note more general exception
@@ -65,7 +90,8 @@ public class Testdb {
         // of the db.
         // It can contain directory names relative to the
         // current working directory
-        conn = DriverManager.getConnection("jdbc:hsqldb:hsql://localhost/",    // filenames
+        conn = DriverManager.getConnection("jdbc:hsqldb:"
+                                           + db_file_name_prefix,    // filenames
                                            "SA",                     // username
                                            "");                      // password
     }
@@ -149,8 +175,10 @@ public class Testdb {
     public static void main(String[] args) {
 
         Testdb db = null;
+        long startTime, endTime;
 
         try {
+        	System.out.println("start");
             db = new Testdb("db_file");
         } catch (Exception ex1) {
             ex1.printStackTrace();    // could not start db
@@ -159,42 +187,143 @@ public class Testdb {
         }
 
         try {
-
-            //make an empty table
-            //
             // by declaring the id column IDENTITY, the db will automatically
             // generate unique values for new rows- useful for row keys
-            db.update(
-                "CREATE TABLE table40 ( id INTEGER IDENTITY, str_col VARCHAR(256), num_col INTEGER)");
+        	
+        	// --CREATE 8 tables--
+        	if (isDDl)
+        	{
+	        	try {
+		        	File file = new File(dataDDL);
+		        	BufferedReader reader = new BufferedReader(new FileReader(file));
+		        	String totalString = "";
+	                String tempString = null;
+	                while ((tempString = reader.readLine()) != null) {
+	                	totalString += tempString;
+	                }
+	                startTime = System.currentTimeMillis();
+	                db.update(totalString);
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("CREATE time:" + (endTime - startTime) + "ms");
+	                reader.close();
+	            } catch (IOException e) {
+	                e.printStackTrace();
+	            }
+        	}
+        	
         } catch (SQLException ex2) {
-
             //ignore
             //ex2.printStackTrace();  // second time we run program
-            //  should throw execption since table
+            //  should throw exception since table
             // already there
             //
             // this will have no effect on the db
         }
 
         try {
-
             // add some rows - will create duplicates if run more then once
             // the id column is automatically generated
-//            db.update(
-//                "INSERT INTO table40(str_col,num_col) VALUES('Ford', 100)");
-//            db.update(
-//                "INSERT INTO table40(str_col,num_col) VALUES('Toyota', 200)");
-//            db.update(
-//                "INSERT INTO table40(str_col,num_col) VALUES('Honda', 300)");
-//            db.update(
-//                "INSERT INTO table40(str_col,num_col) VALUES('GM', 400)");
+        	
+        	// --INSERT 1GB data--
+        	if (isFileInsert)
+        	{
+	        	try {
+	        		int i = 0;
+	        		File file = new File(fileInsert);
+	        		BufferedReader reader = new BufferedReader(new FileReader(file));
+	        		String tempString = null;
+	                startTime = System.currentTimeMillis();
+	                while ((tempString = reader.readLine()) != null) {
+	                    db.update(tempString);
+	                    i++;
+
+
+//	                    if(i > 500000) break;
+
+
+	                    if(i % 10000 == 0)
+	                    	System.out.println(i);
+	                }
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("INSERT time:" + (endTime - startTime) + "ms");
+	                reader.close();
+	            } catch (IOException e) {
+	                e.printStackTrace();
+	            }
+        	}
 
             // do a query
-            db.update("insert into table40 values (1, 'Honda', 300)");
-            db.query("SELECT * FROM table40");
-
+        	//db.query("SELECT * FROM region");
+        	
+        	// --do 22 SELECT--
+        	if (isQuery)
+        	{
+	        	try {
+	        		File file = new File(testQuery);
+	        		BufferedReader reader = new BufferedReader(new FileReader(file));
+	        		String totalString = "";
+	                String tempString = null;
+	                while ((tempString = reader.readLine()) != null) {
+	                	totalString += tempString + ' ';
+	                }
+	                startTime = System.currentTimeMillis();
+	                db.query(totalString);
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("SELECT time:" + (endTime - startTime) + "ms");
+	                reader.close();
+	            } catch (IOException e) {
+	                e.printStackTrace();
+	            }
+        	}
+        	
+        	// --do UPDATE--
+        	if (isInsert)
+        	{
+	        	try {
+	        		int i = 0;
+	        		File file = new File(testInsert);
+	        		BufferedReader reader = new BufferedReader(new FileReader(file));
+	        		String tempString = null;
+	                startTime = System.currentTimeMillis();
+	                while ((tempString = reader.readLine()) != null) {
+	                    db.update(tempString);
+	                    i++;
+	                    if(i % 500 == 0)
+	                    	System.out.println(i);
+	                }
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("UPDATE time:" + (endTime - startTime) + "ms");
+	                reader.close();
+	            } catch (IOException e) {
+	                e.printStackTrace();
+	            }
+        	}
+	        	
+        	// --do DELETE--
+        	if (isDelete)
+        	{
+	        	try {
+	        		int i = 0;
+	        		File file = new File(testDelete);
+	        		BufferedReader reader = new BufferedReader(new FileReader(file));
+	        		String tempString = null;
+	                startTime = System.currentTimeMillis();
+	                while ((tempString = reader.readLine()) != null) {
+	                    db.update(tempString);
+	                    i++;
+	                    if(i % 500 == 0)
+	                    	System.out.println(i);
+	                }
+	                endTime = System.currentTimeMillis();
+	            	System.out.println("DELETE time:" + (endTime - startTime) + "ms");
+	                reader.close();
+	            } catch (IOException e) {
+	                e.printStackTrace();
+	            }
+        	}
+        	
             // at end of program
-            //db.shutdown();
+            db.shutdown();
         } catch (SQLException ex3) {
             ex3.printStackTrace();
         }

@@ -50,6 +50,7 @@ import org.hsqldb.rowio.RowInputInterface;
 import org.hsqldb.rowio.RowOutputBinary180;
 import org.hsqldb.rowio.RowOutputBinaryEncode;
 import org.hsqldb.rowio.RowOutputInterface;
+import org.hsqldb.Page;
 
 /**
  * Acts as a manager for CACHED table persistence.<p>
@@ -201,11 +202,12 @@ public class DataFileCache {
                           * database.logger.getDataFileFactor();
 
         if (defrag) {
-            this.dataFileName   = baseFileName + Logger.newFileExtension;
+            this.dataFileName = baseFileName + Logger.newFileExtension;
             this.backupFileName = baseFileName + Logger.newFileExtension;
-            this.maxCacheRows   = 1024;
-            this.maxCacheBytes  = 1024 * 4096;
         }
+        this.maxCacheRows   = 1024 * 1024;
+        this.maxCacheBytes  = 1024 * 1024 * 1024 * 8l;
+
     }
 
     /**
@@ -253,6 +255,12 @@ public class DataFileCache {
                 dataFile.seek(LONG_FREE_POS_POS);
 
                 fileFreePosition = dataFile.readLong();
+
+                if(fileFreePosition > Page.HEADER_SIZE)
+                {
+                    dataFile.seek(Page.LAST_POS_POS);
+                    Page.lastRowPosStart = dataFile.readLong();
+                }
 
                 dataFile.seek(INT_SPACE_LIST_POS);
 
@@ -922,7 +930,7 @@ public class DataFileCache {
         readLock.lock();
 
         try {
-            CachedObject value = cache.get(i);
+            CachedObject value = cache.getPage(i * dataFileScale / Page.storageSize);
 
             if (value != null) {
                 return value.getStorageSize();
@@ -934,18 +942,18 @@ public class DataFileCache {
         return readSize(i);
     }
 
-    public void replace(CachedObject object) {
-
-        writeLock.lock();
-
-        try {
-            long pos = object.getPos();
-
-            cache.replace(pos, object);
-        } finally {
-            writeLock.unlock();
-        }
-    }
+//    public void replace(CachedObject object) {
+//
+//        writeLock.lock();
+//
+//        try {
+//            long pos = object.getPos();
+//
+//            cache.replace(pos, object);
+//        } finally {
+//            writeLock.unlock();
+//        }
+//    }
 
     public CachedObject get(CachedObject object, PersistentStore store,
                             boolean keep) {
@@ -969,7 +977,7 @@ public class DataFileCache {
                 return null;
             }
 
-            object = cache.get(pos);
+            object = cache.get(pos, store);
 
             if (object != null) {
                 if (keep) {
@@ -997,7 +1005,7 @@ public class DataFileCache {
         readLock.lock();
 
         try {
-            object = cache.get(pos);
+            object = cache.get(pos, store);
 
             if (object != null) {
                 if (keep) {
@@ -1024,7 +1032,7 @@ public class DataFileCache {
         readLock.lock();
 
         try {
-            object = cache.get(pos);
+            object = cache.get(pos, store);
 
             if (object != null) {
                 if (keep) {
@@ -1048,13 +1056,12 @@ public class DataFileCache {
         writeLock.lock();
 
         try {
-            object = cache.get(pos);
+            object = cache.get(pos, store);
 
             if (object != null) {
                 if (keep) {
                     object.keepInMemory(true);
                 }
-
                 return object;
             }
 
@@ -1062,7 +1069,8 @@ public class DataFileCache {
                 try {
                     readObject(pos);
 
-                    object = store.get(rowIn);
+                    //object = store.get(rowIn);
+                    object = cache.get(pos, store);
 
                     break;
                 } catch (Throwable t) {
@@ -1093,7 +1101,7 @@ public class DataFileCache {
 
             // for text tables with empty rows at the beginning,
             // pos may move forward in readObject
-            cache.put(object);
+            //cache.put(object);
 
             if (keep) {
                 object.keepInMemory(true);
@@ -1119,7 +1127,7 @@ public class DataFileCache {
         writeLock.lock();
 
         try {
-            object = cache.get(pos);
+            object = cache.get(pos, store);
 
             if (object != null) {
                 if (keep) {
@@ -1133,7 +1141,8 @@ public class DataFileCache {
                 try {
                     readObject(pos, size);
 
-                    object = store.get(rowIn);
+                    //object = store.get(rowIn);
+                    object = cache.get(pos, store);
 
                     break;
                 } catch (OutOfMemoryError err) {
@@ -1150,7 +1159,7 @@ public class DataFileCache {
 
             // for text tables with empty rows at the beginning,
             // pos may move forward in readObject
-            cache.put(object);
+            // cache.put(object);
 
             if (keep) {
                 object.keepInMemory(true);
@@ -1199,14 +1208,14 @@ public class DataFileCache {
     }
 
     private void readObject(long pos) {
-
         try {
-            dataFile.seek(pos * dataFileScale);
+//            dataFile.seek(pos * dataFileScale);
+//            int size = dataFile.readInt();
+//            rowIn.resetRow(pos, size);
+//            dataFile.read(rowIn.getBuffer(), 4, size - 4);
 
-            int size = dataFile.readInt();
-
-            rowIn.resetRow(pos, size);
-            dataFile.read(rowIn.getBuffer(), 4, size - 4);
+            Page page = new Page(database, dataFileScale, pos, dataFile);
+            cache.putPage(page);
         } catch (Throwable t) {
             logSevereEvent("DataFileCache.readObject", t, pos);
 
@@ -1223,11 +1232,13 @@ public class DataFileCache {
     }
 
     protected void readObject(long pos, int size) {
-
         try {
-            rowIn.resetBlock(pos, size);
-            dataFile.seek(pos * dataFileScale);
-            dataFile.read(rowIn.getBuffer(), 0, size);
+//            rowIn.resetBlock(pos, size);
+//            dataFile.seek(pos * dataFileScale);
+//            dataFile.read(rowIn.getBuffer(), 0, size);
+
+            Page page = new Page(database, dataFileScale, pos, dataFile);
+            cache.putPage(page);
         } catch (Throwable t) {
             logSevereEvent("DataFileCache.readObject", t, pos);
 
@@ -1271,21 +1282,32 @@ public class DataFileCache {
         }
     }
 
-    protected void saveRows(CachedObject[] rows, int offset, int count) {
+    protected void savePages(CachedObject[] pages, int offset, int count) {
 
         if (count == 0) {
             return;
         }
 
-        copyShadow(rows, offset, count);
+        copyShadow(pages, offset, count);
         setFileModified();
 
         for (int i = offset; i < offset + count; i++) {
-            CachedObject r = rows[i];
+            CachedObject r = pages[i];
 
-            saveRowNoLock(r);
+            savePageNoLock((Page)r);
 
-            rows[i] = null;
+            pages[i] = null;
+        }
+    }
+
+    protected void savePageNoLock(Page page) {
+
+        try {
+            page.writePage(dataFile);
+        } catch (Throwable t) {
+            logSevereEvent("DataFileCache.savePageNoLock", t, page.getPos());
+
+            throw Error.error(ErrorCode.DATA_FILE_ERROR, t);
         }
     }
 
@@ -1309,9 +1331,10 @@ public class DataFileCache {
     public void saveRowOutput(long pos) {
 
         try {
-            dataFile.seek(pos * dataFileScale);
-            dataFile.write(rowOut.getOutputStream().getBuffer(), 0,
-                           rowOut.getOutputStream().size());
+//            dataFile.seek(pos * dataFileScale);
+//            dataFile.write(rowOut.getOutputStream().getBuffer(), 0,
+//                           rowOut.getOutputStream().size());
+            cache.getPage(pos).writePage(dataFile);
         } catch (Throwable t) {
             logSevereEvent("DataFileCache.saveRowOutput", t, pos);
 
@@ -1322,11 +1345,12 @@ public class DataFileCache {
     protected void saveRowNoLock(CachedObject row) {
 
         try {
-            rowOut.reset();
-            row.write(rowOut);
-            dataFile.seek(row.getPos() * dataFileScale);
-            dataFile.write(rowOut.getOutputStream().getBuffer(), 0,
-                           rowOut.getOutputStream().size());
+//            rowOut.reset();
+//            row.write(rowOut);
+//            dataFile.seek(row.getPos() * dataFileScale);
+//            dataFile.write(rowOut.getOutputStream().getBuffer(), 0,
+//                           rowOut.getOutputStream().size());
+            cache.getPage(row.getPos()).writePage(dataFile);
         } catch (Throwable t) {
             logSevereEvent("DataFileCache.saveRowNoLock", t, row.getPos());
 
@@ -1334,7 +1358,7 @@ public class DataFileCache {
         }
     }
 
-    protected void copyShadow(CachedObject[] rows, int offset, int count) {
+    protected void copyShadow(CachedObject[] pages, int offset, int count) {
 
         if (shadowFile != null) {
             long time    = cache.saveAllTimer.elapsedTime();
@@ -1342,11 +1366,11 @@ public class DataFileCache {
 
             try {
                 for (int i = offset; i < offset + count; i++) {
-                    CachedObject row = rows[i];
+                    CachedObject page = pages[i];
 
-                    seekpos = row.getPos() * dataFileScale;
+                    seekpos = page.getPos() * Page.storageSize;
 
-                    shadowFile.copy(seekpos, row.getStorageSize());
+                    shadowFile.copy(seekpos, page.getStorageSize());
                 }
 
                 shadowFile.synch();
@@ -1363,16 +1387,16 @@ public class DataFileCache {
         }
     }
 
-    protected void copyShadow(CachedObject row) {
+    protected void copyShadow(CachedObject page) {
 
         if (shadowFile != null) {
-            long seekpos = row.getPos() * dataFileScale;
+            long seekpos = page.getPos() * Page.storageSize;
 
             try {
-                shadowFile.copy(seekpos, row.getStorageSize());
+                shadowFile.copy(seekpos, page.getStorageSize());
                 shadowFile.synch();
             } catch (Throwable t) {
-                logSevereEvent("DataFileCache.copyShadow", t, row.getPos());
+                logSevereEvent("DataFileCache.copyShadow", t, page.getPos());
 
                 throw Error.error(ErrorCode.DATA_FILE_ERROR, t);
             }

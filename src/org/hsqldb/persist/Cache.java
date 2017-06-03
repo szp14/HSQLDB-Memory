@@ -31,11 +31,19 @@
 
 package org.hsqldb.persist;
 
+import java.io.EOFException;
+import java.io.*;
+import org.hsqldb.HsqlException;
+import org.hsqldb.error.Error;
+import org.hsqldb.error.ErrorCode;
 import org.hsqldb.lib.ArraySort;
 import org.hsqldb.lib.Iterator;
 import org.hsqldb.lib.ObjectComparator;
 import org.hsqldb.lib.StopWatch;
 import org.hsqldb.map.BaseHashMap;
+import org.hsqldb.Page;
+
+import java.io.IOException;
 
 /**
  * New implementation of row caching for CACHED tables.<p>
@@ -54,13 +62,15 @@ public class Cache extends BaseHashMap {
     final DataFileCache                        dataFileCache;
     private int                                capacity;         // number of Rows
     private long                               bytesCapacity;    // number of bytes
-    private final CachedObjectComparator       rowComparator;
+    private final CachedObjectComparator       pageComparator;
     private final BaseHashMap.BaseHashIterator objectIterator;
     private boolean                            updateAccess;
     private long                               maxPositionOnCleanup;
-
+    public static int cnt = 0;
 //
-    private CachedObject[] rowTable;
+    private CachedObject[] pageTable;
+    private Page lastPage;
+
     long                   cacheBytesLength;
 
     // for testing
@@ -77,12 +87,12 @@ public class Cache extends BaseHashMap {
         dataFileCache    = dfc;
         capacity         = dfc.capacity();
         bytesCapacity    = dfc.bytesCapacity();
-        rowComparator    = new CachedObjectComparator();
-        rowTable         = new CachedObject[capacity];
+        pageComparator   = new CachedObjectComparator();
+        pageTable        = new CachedObject[capacity];
         cacheBytesLength = 0;
         objectIterator   = new BaseHashIterator(true);
         updateAccess     = true;
-        comparator       = rowComparator;
+        comparator       = pageComparator;
     }
 
     /**
@@ -98,7 +108,7 @@ public class Cache extends BaseHashMap {
     /**
      * Returns a row if in memory cache.
      */
-    public CachedObject get(long pos) {
+    public CachedObject get(long pos, PersistentStore store) {
 
         if (accessCount > ACCESS_MAX && updateAccess) {
             updateAccessCounts();
@@ -106,7 +116,7 @@ public class Cache extends BaseHashMap {
             updateObjectAccessCounts();
         }
 
-        int lookup = getObjectLookup(pos);
+        int lookup = getObjectLookup(pos * dataFileCache.dataFileScale / Page.storageSize);
 
         if (lookup == -1) {
             return null;
@@ -114,19 +124,49 @@ public class Cache extends BaseHashMap {
 
         accessTable[lookup] = ++accessCount;
 
-        CachedObject object = (CachedObject) objectKeyTable[lookup];
+        Page object = (Page) objectKeyTable[lookup];
 
-        return object;
+        return object.getRow(pos, store);
+    }
+
+    public Page getPage(long pos)
+    {
+        long pagePos = (pos * dataFileCache.dataFileScale / Page.storageSize);
+        int lookup = getObjectLookup(pagePos);
+        if(lookup == -1) {
+            try {
+                int rowNum = 0;
+                if(pos * dataFileCache.dataFileScale < Page.lastRowPosStart &&
+                        pos * dataFileCache.dataFileScale < dataFileCache.dataFile.length())
+                {
+                    dataFileCache.dataFile.seek(pagePos * Page.storageSize + Page.HEADER_SIZE);
+                    rowNum = dataFileCache.dataFile.readInt();
+                }
+                Page page = null;
+                if(rowNum != 0) {
+                    page = new Page(dataFileCache.database ,dataFileCache.dataFileScale, (int) pos, dataFileCache.dataFile);
+                } else {
+                    page = new Page(dataFileCache.database, dataFileCache.dataFileScale, (int) pos);
+                }
+                putPage(page);
+                return page;
+            }
+            catch (IOException t) {
+                HsqlException ex = Error.error(ErrorCode.DATA_FILE_ERROR, t);
+                throw ex;
+            }
+        }
+        return (Page)objectKeyTable[lookup];
     }
 
     /**
      * Adds a row to the cache.
      */
-    void put(CachedObject row) {
 
-        int storageSize = row.getStorageSize();
-
-        if (size() >= capacity
+    void putPage(CachedObject page)
+    {
+        int storageSize = page.getStorageSize();
+        if (size() >= capacity //) {
                 || storageSize + cacheBytesLength > bytesCapacity) {
             cleanUp(false);
 
@@ -137,6 +177,8 @@ public class Cache extends BaseHashMap {
             if (size() >= capacity) {
                 cleanUp(true);
             }
+
+            //System.gc();
         }
 
         if (accessCount > ACCESS_MAX && updateAccess) {
@@ -145,10 +187,25 @@ public class Cache extends BaseHashMap {
             updateObjectAccessCounts();
         }
 
-        super.addOrRemoveObject(row, row.getPos(), false);
-        row.setInMemory(true);
+
+        super.addOrRemoveObject(page, page.getPos(), false);
+        page.setInMemory(true);
 
         cacheBytesLength += storageSize;
+    }
+
+    void put(CachedObject row) {
+
+        if (accessCount > ACCESS_MAX && updateAccess) {
+            updateAccessCounts();
+            resetAccessCount();
+            updateObjectAccessCounts();
+        }
+
+        Page page = getPage(row.getPos());
+        page.setRow(row);
+
+        row.setInMemory(true);
     }
 
     /**
@@ -156,29 +213,30 @@ public class Cache extends BaseHashMap {
      */
     CachedObject release(long pos) {
 
-        CachedObject r = (CachedObject) super.addOrRemoveObject(null, pos,
-            true);
-
-        if (r == null) {
-            return null;
-        }
-
-        cacheBytesLength -= r.getStorageSize();
-
-        r.setInMemory(false);
-
-        return r;
+//        CachedObject r = (CachedObject) super.addOrRemoveObject(null, pos / Page.storageSize,
+//            true);
+//
+//        if (r == null) {
+//            return null;
+//        }
+//
+//        cacheBytesLength -= r.getStorageSize();
+//
+//        r.setInMemory(false);
+//
+//        return r;
+        return null;
     }
 
     /**
      * Replace a row in the cache.
      */
-    void replace(long key, CachedObject row) {
-
-        int lookup = super.getLookup(key);
-
-        objectKeyTable[lookup] = row;
-    }
+//    void replace(long key, CachedObject row) {
+//
+//        int lookup = super.getLookup(key);
+//
+//        objectKeyTable[lookup] = row;
+//    }
 
     private void updateAccessCounts() {
 
@@ -242,47 +300,47 @@ public class Cache extends BaseHashMap {
         objectIterator.reset();
 
         for (; objectIterator.hasNext(); ) {
-            CachedObject row = (CachedObject) objectIterator.next();
+            CachedObject page = (CachedObject) objectIterator.next();
             int          currentAccessCount = objectIterator.getAccessCount();
-            boolean      oldRow = currentAccessCount < accessTarget;
-            boolean newRow = row.isNew()
-                             && row.getStorageSize()
-                                >= DataFileCache.initIOBufferSize;
+            boolean      oldPage = currentAccessCount < accessTarget;
+            boolean newPage = page.isNew()
+                    && page.getStorageSize()
+                    >= DataFileCache.initIOBufferSize;
 
-            if (!oldRow && !newRow) {
+            if (!oldPage && !newPage) {
                 continue;
             }
 
             objectIterator.setAccessCount(accessTarget);
 
-            synchronized (row) {
-                if (row.isKeepInMemory()) {
+            synchronized (page) {
+                if (page.isKeepInMemory()) {
                     continue;
                 }
 
-                if (row.hasChanged()) {
-                    rowTable[savecount++] = row;
+                if (page.hasChanged()) {
+                    pageTable[savecount++] = page;
                 }
 
-                if (oldRow) {
-                    row.setInMemory(false);
+                if (oldPage) {
+                    page.setInMemory(false);
                     objectIterator.remove();
 
-                    cacheBytesLength -= row.getStorageSize();
+                    cacheBytesLength -= page.getStorageSize();
 
                     removeCount--;
                 }
             }
 
-            if (savecount == rowTable.length) {
-                saveRows(savecount);
+            if (savecount == pageTable.length) {
+                savePages(savecount);
 
                 savecount = 0;
             }
         }
 
         super.setAccessCountFloor(accessTarget);
-        saveRows(savecount);
+        savePages(savecount);
 
         this.maxPositionOnCleanup = dataFileCache.fileFreePosition
                                     / dataFileCache.dataFileScale;
@@ -293,20 +351,21 @@ public class Cache extends BaseHashMap {
         objectIterator.reset();
 
         for (; objectIterator.hasNext(); ) {
-            CachedObject row = (CachedObject) objectIterator.next();
 
-            synchronized (row) {
-                if (!row.isKeepInMemory() && !row.hasChanged()) {
-                    row.setInMemory(false);
+            CachedObject page = (CachedObject) objectIterator.next();
+
+            synchronized (page) {
+                if (!page.isKeepInMemory() && !page.hasChanged()) {
+                    page.setInMemory(false);
                     objectIterator.remove();
 
-                    cacheBytesLength -= row.getStorageSize();
+                    cacheBytesLength -= page.getStorageSize();
                 }
             }
         }
     }
 
-    private synchronized void saveRows(int count) {
+    private synchronized void savePages(int count) {
 
         if (count == 0) {
             return;
@@ -314,22 +373,23 @@ public class Cache extends BaseHashMap {
 
         long startTime = saveAllTimer.elapsedTime();
 
-        rowComparator.setType(CachedObjectComparator.COMPARE_POSITION);
+        pageComparator.setType(CachedObjectComparator.COMPARE_POSITION);
         sortTimer.zero();
         sortTimer.start();
-        ArraySort.sort(rowTable, 0, count, rowComparator);
+        ArraySort.sort(pageTable, 0, count, pageComparator);
         sortTimer.stop();
         saveAllTimer.start();
-        dataFileCache.saveRows(rowTable, 0, count);
+
+        dataFileCache.savePages(pageTable, 0, count);
 
         saveRowCount += count;
 
         saveAllTimer.stop();
-        logSaveRowsEvent(count, startTime);
+        logSavePagesEvent(count, startTime);
     }
 
     /**
-     * Writes out all modified cached Rows.
+     * Writes out all modified cached Pages.
      */
     void saveAll() {
 
@@ -338,8 +398,8 @@ public class Cache extends BaseHashMap {
         objectIterator.reset();
 
         for (; objectIterator.hasNext(); ) {
-            if (savecount == rowTable.length) {
-                saveRows(savecount);
+            if (savecount == pageTable.length) {
+                savePages(savecount);
 
                 savecount = 0;
             }
@@ -347,20 +407,20 @@ public class Cache extends BaseHashMap {
             CachedObject r = (CachedObject) objectIterator.next();
 
             if (r.hasChanged()) {
-                rowTable[savecount] = r;
+                pageTable[savecount] = r;
 
                 savecount++;
             }
         }
 
-        saveRows(savecount);
+        savePages(savecount);
     }
 
-    void logSaveRowsEvent(int saveCount, long startTime) {
+    void logSavePagesEvent(int saveCount, long startTime) {
 
         StringBuffer sb = new StringBuffer();
 
-        sb.append("cache save rows [count,time] totals ");
+        sb.append("cache save pages [count,time] totals ");
         sb.append(saveRowCount);
         sb.append(',').append(saveAllTimer.elapsedTime()).append(' ');
         sb.append("operation ").append(saveCount).append(',');

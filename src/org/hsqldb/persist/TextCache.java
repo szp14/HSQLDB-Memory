@@ -337,7 +337,7 @@ public class TextCache extends DataFileCache {
         writeLock.lock();
 
         try {
-            CachedObject existing = cache.get(object.getPos());
+            CachedObject existing = cache.get(object.getPos(), store);
 
             if (existing != null) {
                 return object;

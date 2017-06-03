@@ -873,6 +873,23 @@ public class IndexAVL implements Index {
         return !normal;
     }
 
+    private boolean dfs(NodeAVL n, Integer lastV)
+    {
+        if(n == null) return true;
+        if(n.nLeft != null)
+        {
+            if(!dfs(n.nLeft, lastV)) return false;
+        }
+        if(lastV > (Integer)(((Object[])(((NodeAVLDisk)n).row).getData())[colIndex[0]]))
+            return false;
+        lastV = (Integer)(((Object[])(((NodeAVLDisk)n).row).getData())[colIndex[0]]);
+        if(n.nRight != null)
+        {
+            if(!dfs(n.nRight, lastV)) return false;
+        }
+        return true;
+    }
+
     /**
      * Insert a node into the index
      */
@@ -890,6 +907,13 @@ public class IndexAVL implements Index {
         try {
             n = getAccessor(store);
             x = n;
+
+//            Integer key = new Integer(-1);
+//            if(row.getPos() >= 5831795) {
+//                if (!dfs(n, key)) {
+//                    x = n;
+//                }
+//            }
 
             if (n == null) {
                 store.setAccessor(this, ((RowAVL) row).getNode(position));
@@ -1987,7 +2011,6 @@ public class IndexAVL implements Index {
             }
 
             NodeAVL lastnode = nextnode;
-
             if (single) {
                 nextnode = null;
             } else {

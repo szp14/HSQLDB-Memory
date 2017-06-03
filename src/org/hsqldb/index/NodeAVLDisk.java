@@ -345,6 +345,11 @@ public class NodeAVLDisk extends NodeAVL {
 
         row.setNodesChanged();
 
+//        if(row.getPos() == 5831795 && n != null && n.getPos() == 5729980)
+//        {
+//            row  = this.row;
+//        }
+
         node.iParent = n == null ? NO_POS
                                  : (int) n.getPos();
         node.nParent = (NodeAVLDisk) n;
@@ -393,6 +398,11 @@ public class NodeAVLDisk extends NodeAVL {
 
         row.setNodesChanged();
 
+//        if(row.getPos() == 5831795 && n != null && n.getPos() == 5628216)
+//        {
+//            row  = this.row;
+//        }
+
         node.iLeft = n == null ? NO_POS
                                : (int) n.getPos();
         node.nLeft = (NodeAVLDisk) n;
@@ -417,6 +427,11 @@ public class NodeAVLDisk extends NodeAVL {
         }
 
         row.setNodesChanged();
+
+//        if(row.getPos() == 5831795)
+//        {
+//            row  = this.row;
+//        }
 
         node.iRight = n == null ? NO_POS
                                 : (int) n.getPos();

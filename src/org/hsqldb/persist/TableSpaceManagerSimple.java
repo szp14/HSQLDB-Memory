@@ -34,6 +34,7 @@ package org.hsqldb.persist;
 import org.hsqldb.error.Error;
 import org.hsqldb.error.ErrorCode;
 import org.hsqldb.lib.DoubleIntIndex;
+import org.hsqldb.Page;
 
 /**
  * @author Fred Toussi (fredt@users dot sourceforge.net)
@@ -70,6 +71,21 @@ public class TableSpaceManagerSimple implements TableSpaceManager {
             position        = cache.getFileFreePos() / scale;
             newFreePosition = cache.getFileFreePos() + rowSize;
 
+            //my_add_code
+            int isOk = isValid(position * scale, rowSize);
+            if(isOk != 0) {
+                if (isOk == 1)
+                {
+                    Page.lastRowPosStart = (position * scale / Page.storageSize + 1) * Page.storageSize - 8;
+                    position = ((position * scale / Page.storageSize) + 1) * Page.storageSize + Page.HEADER_SIZE;
+                } else if (isOk == -1) {
+                    position = ((position * scale / Page.storageSize)) * Page.storageSize + Page.HEADER_SIZE;
+                }
+                position /= scale;
+                newFreePosition = position * scale + rowSize;
+            }
+            //end
+
             if (newFreePosition > cache.maxDataFileSize) {
                 cache.logSevereEvent("data file reached maximum size "
                                      + cache.dataFileName, null);
@@ -102,5 +118,12 @@ public class TableSpaceManagerSimple implements TableSpaceManager {
 
     public boolean isDefaultSpace() {
         return true;
+    }
+
+    public int isValid(long pos, long rowSize)
+    {
+        if(pos % Page.storageSize < Page.HEADER_SIZE) return -1;
+        if(pos + rowSize > Page.lastRowPosStart) return 1;
+        return 0;
     }
 }

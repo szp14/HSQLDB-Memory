@@ -35,6 +35,7 @@ import org.hsqldb.error.Error;
 import org.hsqldb.error.ErrorCode;
 import org.hsqldb.lib.ArrayUtil;
 import org.hsqldb.lib.DoubleIntIndex;
+import org.hsqldb.Page;
 
 /**
  * Manages allocation of space for rows.<p>
@@ -157,17 +158,34 @@ public class TableSpaceManagerBlocks implements TableSpaceManager {
         if (asBlocks) {
             position = ArrayUtil.getBinaryMultipleCeiling(position,
                     DataSpaceManager.fixedBlockSizeUnit);
-
-            long released = position - freshBlockFreePos;
-
-            if (released > 0) {
-                release(freshBlockFreePos / scale, (int) released);
-
-                freshBlockFreePos = position;
-            }
         }
 
+        long released = position - freshBlockFreePos;
+
+        //my_add_code
+        int isOk = isValid(position, rowSize);
+        if(isOk == 1)
+        {
+            released = Page.lastRowPosStart - freshBlockFreePos;
+            Page.lastRowPosStart = (position / Page.storageSize + 2) * Page.storageSize - 8;
+            position = (position / Page.storageSize + 1) * Page.storageSize + Page.HEADER_SIZE;
+        }
+        else if(isOk == -1)
+        {
+            position = (position / Page.storageSize) * Page.storageSize + Page.HEADER_SIZE;
+            released = position - freshBlockFreePos;
+        }
+        //end
+
+        if (released > 0) {
+            release(freshBlockFreePos / scale, (int) released);
+        }
+
+        freshBlockFreePos = position;
+
         freshBlockFreePos += rowSize;
+
+        Page.lastRowPosStart -= 8;
 
         return position / scale;
     }
@@ -278,4 +296,13 @@ public class TableSpaceManagerBlocks implements TableSpaceManager {
         spaceManager.freeTableSpace(lookup, freshBlockFreePos,
                                     freshBlockFreePos, false);
     }
+
+    //this pos is counted by bytes
+    public int isValid(long pos, long rowSize)
+    {
+        if(pos % Page.storageSize < Page.HEADER_SIZE) return -1;
+        if(pos + rowSize > Page.lastRowPosStart) return 1;
+        return 0;
+    }
+
 }
